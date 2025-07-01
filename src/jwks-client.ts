@@ -1,7 +1,7 @@
 import { JWKSClientConfig, JWKSKey, JWKSResponse } from './types';
 import {  arrayBufferToBase64, base64urlToArrayBuffer } from './utils/crypto';
 import { LRUCache } from './utils/cache';
-import { pemFooter, pemHeader } from './constants';
+import { jwksMaxAttempts, jwksRetryDelayMs, pemFooter, pemHeader } from './constants';
 
 /**
  * Internal JWKS (JSON Web Key Set) client for fetching Wristband keys.
@@ -99,12 +99,7 @@ export class JWKSClient {
     }
 
     // Fetch JWKS from Wristband
-    const response = await fetch(this.jwksUri);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch JWKS: ${response.status} ${response.statusText}`);
-    }
-
-    const jwks = await response.json() as unknown as JWKSResponse;
+    const jwks = await this.fetchJwksWithRetry();
     const jwk = jwks.keys.find(k => k.kid === kid);
     
     if (!jwk) {
@@ -174,6 +169,38 @@ export class JWKSClient {
    */
   getCacheStats(): { size: number; maxSize: number; hitRatio?: number; } {
     return this.cache.getStats();
+  }
+
+   /**
+   * Fetches JWKS from the endpoint with retry logic. Attempts up to 3 times with 100ms delay between attempts.
+   * 
+   * @private
+   * @returns Promise resolving to the JWKS response
+   * @throws {Error} If all retry attempts fail
+   */
+  private async fetchJwksWithRetry(): Promise<JWKSResponse> {
+    for (let attempt = 1; attempt <= jwksMaxAttempts; attempt++) {
+      try {
+        const response = await fetch(this.jwksUri);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json() as unknown as JWKSResponse;
+      } catch (error) {
+        const isLastAttempt = attempt === jwksMaxAttempts;
+
+        if (isLastAttempt) {
+          throw new Error(`Failed to fetch JWKS after ${jwksMaxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+
+        // Wait before next attempt
+        await new Promise(resolve => setTimeout(resolve, jwksRetryDelayMs));
+      }
+    }
+    
+    // This should never be reached (appeasing Typescript)
+    throw new Error('Unexpected error in JWKS fetch retry logic');
   }
 
   /**

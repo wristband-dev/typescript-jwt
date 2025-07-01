@@ -177,44 +177,34 @@ describe('JWKSClient', () => {
       });
     });
 
-    describe('network error handling', () => {
-      it('should throw on network fetch failure', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    describe('network error handling with retry logic', () => {
+      it('should retry on HTTP error response and eventually succeed', async () => {
+        // First two attempts return 500, third succeeds
+        mockFetch
+          .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response)
+          .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response)
+          .mockResolvedValueOnce({ ok: true, json: async () => VALID_JWKS_RESPONSE } as Response);
 
-        await expect(client.getSigningKey('test-key-id'))
-          .rejects.toThrow('Network error');
+        const key = await client.getSigningKey('test-key-id');
+        expect(key).toMatch(/^-----BEGIN PUBLIC KEY-----/);
+        expect(mockFetch).toHaveBeenCalledTimes(3);
       });
 
-      it('should throw on HTTP error response', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found'
-        } as Response);
+      it('should fail after all 3 retry attempts are exhausted', async () => {
+        const startTime = Date.now();
+
+        mockFetch
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockRejectedValueOnce(new Error('Network error'));
 
         await expect(client.getSigningKey('test-key-id'))
-          .rejects.toThrow('Failed to fetch JWKS: 404 Not Found');
-      });
-
-      it('should throw on HTTP 500 error', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error'
-        } as Response);
-
-        await expect(client.getSigningKey('test-key-id'))
-          .rejects.toThrow('Failed to fetch JWKS: 500 Internal Server Error');
-      });
-
-      it('should throw on invalid JSON response', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => { throw new Error('Invalid JSON'); }
-        } as unknown as Response);
-
-        await expect(client.getSigningKey('test-key-id'))
-          .rejects.toThrow('Invalid JSON');
+          .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
+        
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+        // should respect retry delay timing - 2 delays of 100ms each
+        const elapsed = Date.now() - startTime;
+        expect(elapsed).toBeGreaterThanOrEqual(200);
       });
     });
 
@@ -585,40 +575,45 @@ describe('JWKSClient', () => {
       });
     });
 
-    it('should recover from network errors on retry', async () => {
-      // First call fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    it('should recover from network errors on subsequent requests', async () => {
+      // First request: all retries fail
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'));
 
       await expect(client.getSigningKey('test-key-id'))
-        .rejects.toThrow('Network error');
+        .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
 
-      // Second call succeeds
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => VALID_JWKS_RESPONSE
-      } as Response);
+      // Second request succeeds on first try
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => VALID_JWKS_RESPONSE } as Response);
 
       const key = await client.getSigningKey('test-key-id');
       expect(key).toMatch(/^-----BEGIN PUBLIC KEY-----/);
+      expect(mockFetch).toHaveBeenCalledTimes(4); // 3 failed + 1 successful
     });
 
     it('should not cache failed requests', async () => {
-      // First call fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      // All 3 attempts fail
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'));
 
       await expect(client.getSigningKey('test-key-id'))
-        .rejects.toThrow('Network error');
+        .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
 
       expect(client.getCacheStats().size).toBe(0);
 
-      // Second call should make another network request
+      // Second call should make another network request (another 3 attempts)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => VALID_JWKS_RESPONSE
       } as Response);
 
       await client.getSigningKey('test-key-id');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(4); // 3 failed + 1 successful
+      expect(client.getCacheStats().size).toBe(1);
     });
   });
 });
