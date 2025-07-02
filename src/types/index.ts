@@ -248,22 +248,27 @@ export interface CacheOptions {
 }
 
 /**
- * Internal structure representing a cached entry with metadata. Contains the cached value along with
- * timing information needed for LRU eviction decisions and TTL expiration checking.
+ * Node in the doubly-linked list for LRU cache operations.
  */
-export interface CacheEntry {
+export interface LRUNode {
   /**
-   * The cached string value.
+   * The cache key for this entry
+   */
+  key: string;
+  /**
+   * The cached JWK value
    */
   value: string;
   /**
-   * Timestamp of when this entry was last accessed (Unix milliseconds).
-   * Updated on every get() operation to maintain accurate LRU ordering.
+   * Timestamp when this entry was last accessed
    */
   lastAccessed: number;
   /**
-   * Timestamp of when this entry was created or last updated (Unix milliseconds).
-   * Used for TTL expiration calculations.
+   * Pointer to the previous node in the doubly-linked list (null for head)
    */
-  created: number;
+  prev: LRUNode | null;
+  /**
+   * Pointer to the next node in the doubly-linked list (null for tail)
+   */
+  next: LRUNode | null;
 }

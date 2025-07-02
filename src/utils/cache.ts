@@ -1,37 +1,21 @@
-import { CacheEntry, CacheOptions } from '../types';
+import { CacheOptions, LRUNode } from '../types';
 
 /**
- * High-performance LRU (Least Recently Used) cache with TTL support.
+ * Least Recently Used (LRU) cache with optional TTL support.
  * 
- * This implementation provides true access-time based eviction rather than insertion-order
- * eviction, making it ideal for caching JWKS keys where access patterns matter more than
- * creation order.
+ * This implementation uses a doubly-linked list combined with a hash map to achieve
+ * O(1) performance for all operations.
  * 
  * Key features:
- * - **True LRU eviction**: Based on actual access time, not insertion order
+ * - **O(1) operations**: Get, Set, Has, and eviction are all O(1)
+ * - **LRU eviction**: Based on actual access order with constant-time eviction
  * - **TTL support**: Optional automatic expiration of entries
  * - **Memory safety**: Bounded size with predictable memory usage
  * - **Framework agnostic**: Works in Node.js, Deno, Bun, Edge Runtime, etc.
  * - **Thread-safe operations**: All operations are synchronous and atomic
  * 
- * Performance characteristics:
- * - Get/Set/Has operations: O(1) average case
- * - Eviction operation: O(n) when cache is at capacity and new entry is added
- * - Memory overhead: Minimal metadata per entry
- * 
  * @example
  * ```typescript
- * // Basic cache without TTL
- * const cache = new LRUCache({ maxSize: 100 });
- * cache.set('key1', 'value1');
- * const value = cache.get('key1'); // 'value1'
- * 
- * // Cache with 10-minute TTL
- * const cacheWithTTL = new LRUCache({ 
- *   maxSize: 50, 
- *   ttl: 10 * 60 * 1000 
- * });
- * 
  * // JWKS key caching example
  * const jwksCache = new LRUCache({ maxSize: 20, ttl: 3600000 }); // 1 hour
  * jwksCache.set('kid123', publicKeyPem);
@@ -40,10 +24,9 @@ import { CacheEntry, CacheOptions } from '../types';
  */
 export class LRUCache {
   /**
-   * Internal Map storing cache entries with metadata. Uses JavaScript Map for O(1) key
-   * lookups and maintains insertion order for iteration.
+   * Hash map for O(1) key lookups pointing to doubly-linked list nodes.
    */
-  private cache = new Map<string, CacheEntry>();
+  private cache = new Map<string, LRUNode>();
   /**
    * Maximum number of entries allowed in the cache. Triggers LRU eviction when exceeded.
    */
@@ -53,76 +36,97 @@ export class LRUCache {
    * regardless of access patterns.
    */
   private ttl?: number;
+  /**
+   * Head of the doubly-linked list (most recently used)
+   */
+  private head: LRUNode;
+  /**
+   * Tail of the doubly-linked list (least recently used)
+   */
+  private tail: LRUNode;
 
   /**
    * Creates a new LRU cache instance with the specified configuration.
    * 
    * @param options - Configuration object specifying cache behavior
-   * @throws {Error} If maxSize is not a positive integer
+   * @throws {Error} If maxSize or ttl are not a positive integer
    * 
    * @example
    * ```typescript
-   * // Simple cache for 100 items
+   * // Simple cache for 100 keys
    * const cache = new LRUCache({ maxSize: 100 });
    * 
-   * // Cache with 5-minute expiration
-   * const expiringCache = new LRUCache({ 
-   *   maxSize: 50, 
-   *   ttl: 5 * 60 * 1000 
-   * });
+   * // Cache with 60-minute expiration
+   * const expiringCache = new LRUCache({ maxSize: 50, ttl: 60 * 60 * 1000 });
    * ```
    */
   constructor(options: CacheOptions) {
+    if (!options.maxSize || !Number.isInteger(options.maxSize) || options.maxSize <= 0) {
+      throw new Error('maxSize must be a positive integer');
+    }
+    if (options.ttl && (!Number.isInteger(options.ttl) || options.ttl <= 0)) {
+      throw new Error('ttl must be a positive integer (if specified)');
+    }
+    
     this.maxSize = options.maxSize;
-    this.ttl = options.ttl;
+    this.ttl = options.ttl ?? undefined;
+    
+    // Initialize dummy head and tail nodes to simplify edge cases
+    this.head = { key: '', value: '', lastAccessed: 0, prev: null, next: null };
+    this.tail = { key: '', value: '', lastAccessed: 0, prev: null, next: null };
+    this.head.next = this.tail;
+    this.tail.prev = this.head;
   }
 
   /**
-   * Retrieves a value from the cache and updates its access time for LRU tracking.
+   * Retrieves a value from the cache and moves it to the front (most recently used).
    * 
-   * This method implements true LRU behavior by updating the lastAccessed timestamp
-   * on every successful retrieval. If the entry has expired based on TTL, it will
-   * be automatically removed and undefined will be returned.
+   * This method implements LRU behavior with O(1) performance by moving the accessed node to the
+   * head of the doubly-linked list. If the entry has expired based on TTL, it will be automatically
+   * removed and undefined will be returned.
    * 
    * @param key - The cache key to retrieve
    * @returns The cached value if found and not expired, undefined otherwise
    * 
    * @example
    * ```typescript
-   * cache.set('user:123', 'john@example.com');
+   * cache.set('kid123', 'public_key123');
    * 
    * // Later...
-   * const email = cache.get('user:123'); // 'john@example.com'
-   * const missing = cache.get('user:999'); // undefined
+   * const key123 = cache.get('kid123'); // 'public_key123' moves to front
+   * const missing = cache.get('kid999'); // undefined
    * 
    * // After TTL expiration (if configured)
-   * const expired = cache.get('user:123'); // undefined (auto-removed)
+   * const expired = cache.get('kid123'); // undefined (auto-removed)
    * ```
    */
   get(key: string): string | undefined {
-    const entry = this.cache.get(key);
-    if (!entry) {
+    // First check for existing key
+    const node = this.cache.get(key);
+    if (!node) {
       return undefined;
     }
 
     // Check TTL expiration
-    if (this.ttl && Date.now() - entry.created > this.ttl) {
+    if (this.ttl && Date.now() - node.lastAccessed > this.ttl) {
+      this.removeNode(node);
       this.cache.delete(key);
       return undefined;
     }
 
-    // Update last accessed time for proper LRU behavior
-    entry.lastAccessed = Date.now();
+    // Move to front (most recently used) and update access time
+    node.lastAccessed = Date.now();
+    this.moveToFront(node);
     
-    return entry.value;
+    return node.value;
   }
 
   /**
-   * Stores a value in the cache with proper LRU eviction when size limit is exceeded.
+   * Stores a value in the cache with O(1) LRU eviction when size limit is exceeded.
    * 
-   * If the key already exists, updates the value and resets both access and creation
-   * timestamps. If adding a new entry would exceed maxSize, evicts the least recently
-   * used entry before adding the new one.
+   * If the key already exists, updates the value and moves it to the front.
+   * If adding a new entry would exceed maxSize, evicts the least recently
+   * used entry (tail) in O(1) time before adding the new one.
    * 
    * @param key - The cache key to store
    * @param value - The string value to cache
@@ -130,43 +134,40 @@ export class LRUCache {
    * @example
    * ```typescript
    * // Store new entries
-   * cache.set('config:theme', 'dark');
-   * cache.set('config:lang', 'en-US');
+   * cache.set('kid123', 'public_key123');
+   * cache.set('kid456', 'public_key456');
    * 
-   * // Update existing entry (resets TTL if configured)
-   * cache.set('config:theme', 'light');
+   * // Update existing entry (moves to front, resets TTL if configured)
+   * cache.set('kid123', 'public_key123');
    * 
-   * // When cache is full, LRU entry is automatically evicted
-   * cache.set('config:timezone', 'UTC'); // May evict oldest unused entry
+   * // When cache is full, LRU entry is automatically evicted in O(1) time
+   * cache.set('kid789', 'public_key789'); // Evicts tail node instantly
    * ```
    */
   set(key: string, value: string): void {
     const now = Date.now();
+    const existingNode = this.cache.get(key);
     
-    // Update existing entry
-    if (this.cache.has(key)) {
-      const entry = this.cache.get(key)!;
-      entry.value = value;
-      entry.lastAccessed = now;
-      entry.created = now;
+    // Make existing node most recently used
+    if (existingNode) {
+      existingNode.lastAccessed = now;
+      this.moveToFront(existingNode);
       return;
     }
 
-    // Add new entry
-    this.cache.set(key, {
-      value,
-      lastAccessed: now,
-      created: now,
-    });
+    // Otherwise create a new node
+    const newNode: LRUNode = { key, value, lastAccessed: now, prev: null, next: null };
+    this.cache.set(key, newNode);
+    this.addToFront(newNode);
 
-    // Proper LRU eviction: remove least recently accessed item
+    // Eviction occurs if over capacity
     if (this.cache.size > this.maxSize) {
       this.evictLeastRecentlyUsed();
     }
   }
 
   /**
-   * Checks if a key exists in the cache without updating access time.
+   * Checks if a key exists in the cache without updating access order.
    * 
    * This is useful for existence checks that shouldn't affect LRU ordering.
    * Automatically removes and returns false for expired entries.
@@ -176,27 +177,28 @@ export class LRUCache {
    * 
    * @example
    * ```typescript
-   * cache.set('temp:data', 'value');
+   * cache.set('key123', 'public_key123');
    * 
-   * if (cache.has('temp:data')) {
+   * if (cache.has('key123')) {
    *   console.log('Data exists in cache');
-   *   // Access time is NOT updated by this check
+   *   // LRU order is NOT affected by this check
    * }
    * 
    * // Check for expired entries
-   * if (!cache.has('old:data')) {
+   * if (!cache.has('oldKey')) {
    *   console.log('Data missing or expired');
    * }
    * ```
    */
   has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) {
+    const node = this.cache.get(key);
+    if (!node) {
       return false;
     }
 
     // Check if expired
-    if (this.ttl && Date.now() - entry.created > this.ttl) {
+    if (this.ttl && Date.now() - node.lastAccessed > this.ttl) {
+      this.removeNode(node);
       this.cache.delete(key);
       return false;
     }
@@ -205,52 +207,52 @@ export class LRUCache {
   }
 
   /**
-   * Removes a specific key from the cache.
+   * Removes a specific key from the cache in O(1) time.
    * 
    * @param key - The cache key to remove
    * @returns True if the key existed and was removed, false if it didn't exist
    * 
    * @example
    * ```typescript
-   * cache.set('session:abc123', 'user-data');
+   * cache.set('key123', 'public_key123');
    * 
-   * // Later, when session expires
-   * const wasRemoved = cache.delete('session:abc123'); // true
-   * const alreadyGone = cache.delete('session:abc123'); // false
+   * // Later, when entry expires
+   * const wasRemoved = cache.delete('key123'); // true
+   * const alreadyGone = cache.delete('key123'); // false
    * ```
    */
   delete(key: string): boolean {
-    return this.cache.delete(key);
+    const node = this.cache.get(key);
+    if (!node) {
+      return false;
+    }
+
+    this.removeNode(node);
+    this.cache.delete(key);
+    return true;
   }
 
   /**
-   * Removes all entries from the cache.
-   * 
-   * Resets the cache to an empty state, freeing all stored memory.
-   * Useful for testing or when a complete cache invalidation is needed.
+   * Removes all entries from the cache. Resets the cache to an empty state and
+   * reinitializes the doubly-linked list.
    * 
    * @example
    * ```typescript
-   * // Emergency cache flush
-   * cache.clear();
-   * console.log(cache.size()); // 0
-   * 
    * // Reset during testing
    * beforeEach(() => {
    *   cache.clear();
+   *   console.log(cache.size()); // 0
    * });
    * ```
    */
   clear(): void {
     this.cache.clear();
+    this.head.next = this.tail;
+    this.tail.prev = this.head;
   }
 
   /**
    * Returns the current number of entries in the cache.
-   * 
-   * Note that this count includes entries that may have expired but haven't
-   * been accessed yet (lazy expiration). For accurate counts, consider calling
-   * a cleanup method if implementing one.
    * 
    * @returns The number of entries currently stored
    * 
@@ -262,11 +264,6 @@ export class LRUCache {
    * cache.set('a', '1');
    * cache.set('b', '2');
    * console.log(cache.size()); // 2
-   * 
-   * // Check cache utilization
-   * if (cache.size() > cache.getStats().maxSize * 0.8) {
-   *   console.log('Cache is getting full');
-   * }
    * ```
    */
   size(): number {
@@ -276,9 +273,6 @@ export class LRUCache {
   /**
    * Returns cache statistics for monitoring and debugging.
    * 
-   * Provides insights into cache utilization and performance characteristics.
-   * Useful for monitoring cache effectiveness and tuning cache parameters.
-   * 
    * @returns Object containing current cache statistics
    * 
    * @example
@@ -286,64 +280,67 @@ export class LRUCache {
    * const stats = cache.getStats();
    * console.log(`Cache utilization: ${stats.size}/${stats.maxSize}`);
    * console.log(`Fill ratio: ${(stats.size / stats.maxSize * 100).toFixed(1)}%`);
-   * 
-   * // Monitor for capacity planning
-   * if (stats.size >= stats.maxSize * 0.9) {
-   *   console.warn('Cache nearing capacity, consider increasing maxSize');
-   * }
-   * 
-   * // Future enhancement: hit ratio tracking
-   * if (stats.hitRatio !== undefined) {
-   *   console.log(`Hit ratio: ${(stats.hitRatio * 100).toFixed(1)}%`);
-   * }
    * ```
    */
   getStats(): { size: number; maxSize: number; hitRatio?: number } {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxSize,
-      // Could add hit/miss tracking here if needed
-    };
+    return { size: this.cache.size, maxSize: this.maxSize };
   }
 
   /**
-   * Finds and removes the least recently accessed entry from the cache.
-   * 
-   * This is the core LRU eviction logic that maintains cache size limits.
-   * Iterates through all entries to find the one with the oldest lastAccessed
-   * timestamp, then removes it. This is an O(n) operation that only occurs
-   * when adding a new entry would cause the cache to reach maxSize + 1.
-   * 
-   * The algorithm prioritizes correctness over performance for eviction since
-   * it only happens when the cache is full, and the O(1) performance of regular
-   * operations is more important than the occasional O(n) eviction.
+   * Moves a node to the front of the doubly-linked list (most recently used).
+   * This is an O(1) operation that maintains LRU ordering.
    * 
    * @private
-   * @internal This method is used internally by set() and should not be called directly
+   * @param node - The node to move to front
+   */
+  private moveToFront(node: LRUNode): void {
+    this.removeNode(node);
+    this.addToFront(node);
+  }
+
+  /**
+   * Adds a node to the front of the doubly-linked list (after head).
+   * This is an O(1) operation.
    * 
-   * @example
-   * ```typescript
-   * // Internal usage only - called automatically by set()
-   * // When cache.size() > maxSize:
-   * // 1. Find entry with oldest lastAccessed timestamp
-   * // 2. Remove that entry from the cache
-   * // 3. Make room for new entry
-   * ```
+   * @private
+   * @param node - The node to add to front
+   */
+  private addToFront(node: LRUNode): void {
+    node.prev = this.head;
+    node.next = this.head.next;
+    
+    if (this.head.next) {
+      this.head.next.prev = node;
+    }
+    this.head.next = node;
+  }
+
+  /**
+   * Removes a node from the doubly-linked list. This is an O(1) operation.
+   * 
+   * @private
+   * @param node - The node to remove
+   */
+  private removeNode(node: LRUNode): void {
+    if (node.prev) {
+      node.prev.next = node.next;
+    }
+    if (node.next) {
+      node.next.prev = node.prev;
+    }
+  }
+
+  /**
+   * Removes the least recently used entry (tail) from the cache. This is an O(1)
+   * operation that maintains cache size limits.
+   * 
+   * @private
    */
   private evictLeastRecentlyUsed(): void {
-    let oldestKey = '';
-    let oldestTime = Infinity;
-    
-    // Find the key with the oldest lastAccessed time
-    for (const [key, entry] of this.cache) {
-      if (entry.lastAccessed < oldestTime) {
-        oldestTime = entry.lastAccessed;
-        oldestKey = key;
-      }
-    }
-    
-    if (oldestKey) {
-      this.cache.delete(oldestKey);
+    const lru = this.tail.prev;
+    if (lru && lru !== this.head) {
+      this.removeNode(lru);
+      this.cache.delete(lru.key);
     }
   }
 }

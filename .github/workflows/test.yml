@@ -13,12 +13,12 @@ on:
       - 'LICENSE'
 
 jobs:
-  test:
+  test-node:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node: [20.x, 22.x]
-    name: Use Node.js ${{ matrix.node-version }}
+    name: Use Node.js ${{ matrix.node }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
@@ -29,3 +29,43 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+
+  test-deno:
+    runs-on: ubuntu-latest
+    name: Deno Latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: Build with Node.js
+        run: |
+          npm ci
+          npm run build
+      - name: Test Deno compatibility
+        run: |
+          cat > deno_test.ts << 'EOF'
+          // Test that Deno can import and instantiate your Wristband JWT SDK
+          import { createWristbandJwtValidator } from "./dist/index.esm.js";
+          
+          console.log('✅ Deno successfully imported the Wristband JWT SDK');
+          
+          // Test that we can create an instance
+          try {
+            const wristbandJwtValidator = createWristbandJwtValidator({
+              wristbandApplicationVanityDomain: 'test.io',
+            });
+            
+            if (!wristbandJwtValidator) {
+              throw new Error('createWristbandJwtValidator returned null/undefined');
+            }
+            
+            console.log('✅ Wristband JWT SDK instance created successfully in Deno');
+          } catch (error) {
+            console.error('❌ SDK instantiation failed:', error);
+            Deno.exit(1);
+          }
+          EOF
+          
+          deno run deno_test.ts
