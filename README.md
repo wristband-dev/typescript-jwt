@@ -106,9 +106,9 @@ export { wristbandJwtValidator };
 
 ## 4) Extract and Validate JWT Tokens
 
-The SDK provides methods to extract Bearer tokens from Authorization headers and validate them. Here are middleware examples for a few frameworks:
+The SDK provides methods to extract Bearer tokens from Authorization headers and validate them. Here are examples for a few frameworks:
 
-### Express Middleware
+### Express
 
 ```typescript
 // middleware.ts
@@ -150,7 +150,7 @@ app.listen(3000, () => {
 
 <br/>
 
-### NextJS Middleware
+### NextJS
 
 ```typescript
 // middleware.ts
@@ -189,7 +189,7 @@ export const config = {
 
 <br/>
 
-### Deno Middleware
+### Deno
 
 ```typescript
 // middleware.ts
