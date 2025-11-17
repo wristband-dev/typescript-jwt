@@ -15,10 +15,12 @@ on:
 jobs:
   test-node:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
-        node: [20.x, 22.x]
-    name: Use Node.js ${{ matrix.node }}
+        node: [20.x, 22.x, 24.x]
+    name: Node.js ${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
@@ -32,7 +34,9 @@ jobs:
 
   test-deno:
     runs-on: ubuntu-latest
-    name: Deno Latest
+    permissions:
+      contents: read
+    name: Deno Compatibility Test
     steps:
       - uses: actions/checkout@v4
       - name: Set up Deno
