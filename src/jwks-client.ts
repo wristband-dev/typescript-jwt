@@ -1,7 +1,9 @@
-import { JWKSClientConfig, JWKSKey, JWKSResponse } from './types';
+import { CacheOptions, JWKSClientConfig, JWKSKey, JWKSResponse } from './types';
 import {  arrayBufferToBase64, base64urlToArrayBuffer } from './utils/crypto';
 import { LRUCache } from './utils/cache';
 import { jwksMaxAttempts, jwksRetryDelayMs, pemFooter, pemHeader } from './constants';
+
+const DEFAULT_CACHE_MAX_SIZE = 20;
 
 /**
  * Internal JWKS (JSON Web Key Set) client for fetching Wristband keys.
@@ -24,9 +26,16 @@ import { jwksMaxAttempts, jwksRetryDelayMs, pemFooter, pemHeader } from './const
  */
 export class JWKSClient {
   /**
-   * LRU cache instance for storing converted PEM keys.
+   * Lazily-initialized LRU cache instance for storing converted PEM keys.
+   * Null until first access, then instantiated with the stored cacheConfig.
+   * This defers cache creation until runtime to avoid bundler issues.
    */
-  private cache: LRUCache;
+  private cache: LRUCache | null = null;
+  /**
+   * Configuration options for the LRU cache (maxSize and optional TTL).
+   * Stored during construction and used for lazy cache instantiation.
+   */
+  private cacheConfig: CacheOptions;
   /**
    * The URI endpoint for fetching the JSON Web Key Set.
    */
@@ -53,8 +62,26 @@ export class JWKSClient {
       throw new Error('A valid JWKS URI is required.');
     }
     this.jwksUri = config.jwksUri;
-    // Undefined TTL = cached indefinitely
-    this.cache = new LRUCache({ maxSize: config.cacheMaxSize ?? 20, ttl: config.cacheTtl });
+    this.cacheConfig = {
+      // Undefined TTL = cached indefinitely
+      maxSize: config.cacheMaxSize ?? DEFAULT_CACHE_MAX_SIZE,
+      ttl: config.cacheTtl
+    };
+  }
+
+  /**
+   * Returns the LRU cache instance, creating it on first access if needed.
+   * This lazy initialization pattern prevents runtime object instantiation during
+   * module loading, which can cause issues with bundlers like webpack.
+   * 
+   * @private
+   * @returns The LRU cache instance for storing PEM keys
+   */
+  private getCache(): LRUCache {
+    if (!this.cache) {
+      this.cache = new LRUCache(this.cacheConfig);
+    }
+    return this.cache;
   }
 
   /**
@@ -93,7 +120,7 @@ export class JWKSClient {
    */
   async getSigningKey(kid: string): Promise<string> {
     // Check cache first using proper LRU cache
-    const cachedKey = this.cache.get(kid);
+    const cachedKey = this.getCache().get(kid);
     if (cachedKey) {
       return cachedKey;
     }
@@ -114,7 +141,7 @@ export class JWKSClient {
     const publicKey = this.jwkToPem(jwk);
 
     // Cache the key using LRU cache
-    this.cache.set(kid, publicKey);
+    this.getCache().set(kid, publicKey);
 
     return publicKey;
   }
@@ -140,7 +167,7 @@ export class JWKSClient {
    * ```
    */
   clear(): void {
-    this.cache.clear();
+    this.getCache().clear();
   }
 
   /**
@@ -168,7 +195,7 @@ export class JWKSClient {
    * ```
    */
   getCacheStats(): { size: number; maxSize: number; hitRatio?: number; } {
-    return this.cache.getStats();
+    return this.getCache().getStats();
   }
 
    /**
