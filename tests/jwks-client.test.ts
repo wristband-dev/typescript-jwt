@@ -111,6 +111,66 @@ describe('JWKSClient', () => {
       
       expect(client.getCacheStats().maxSize).toBe(20);
     });
+
+    it('should not instantiate cache until first use (lazy loading)', () => {
+      const client = new JWKSClient({
+        jwksUri: 'https://test.example.com/jwks',
+        cacheMaxSize: 20
+      });
+      
+      // Cache should not be instantiated yet
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).toBeNull();
+      
+      // First access should create the cache
+      const stats = client.getCacheStats();
+      expect(stats.maxSize).toBe(20);
+      
+      // Cache should now be instantiated
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).not.toBeNull();
+    });
+
+    it('should lazy-load cache on getSigningKey call', async () => {
+      const client = new JWKSClient({
+        jwksUri: 'https://test.example.com/jwks',
+        cacheMaxSize: 10
+      });
+      
+      // Cache should not be instantiated yet
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).toBeNull();
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => VALID_JWKS_RESPONSE
+      } as Response);
+      
+      // This should trigger cache creation
+      await client.getSigningKey('test-key-id');
+      
+      // Cache should now be instantiated
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).not.toBeNull();
+    });
+
+    it('should lazy-load cache on clear call', () => {
+      const client = new JWKSClient({
+        jwksUri: 'https://test.example.com/jwks',
+        cacheMaxSize: 10
+      });
+      
+      // Cache should not be instantiated yet
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).toBeNull();
+      
+      // This should trigger cache creation
+      client.clear();
+      
+      // Cache should now be instantiated
+      // @ts-expect-error - Accessing private property for testing
+      expect(client.cache).not.toBeNull();
+    });
   });
 
   describe('getSigningKey', () => {
