@@ -2,7 +2,7 @@
   "name": "@wristband/typescript-jwt",
   "description": "A framework-agnostic Typescript SDK that validates JWT access tokens issued by Wristband for user or machine authentication.",
   "author": "Wristband",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "license": "MIT",
   "private": false,
   "homepage": "https://wristband.dev",

@@ -46,15 +46,15 @@ export function base64urlDecode(str: string): string {
 }
 
 /**
- * Converts a base64url-encoded string directly to an ArrayBuffer.
+ * Converts a base64url-encoded string directly to a Uint8Array.
  * 
  * This is more efficient than decoding to string first when the end goal
  * is binary data for cryptographic operations. Used primarily for converting
- * JWT signatures from base64url format to ArrayBuffer for Web Crypto API verification.
+ * JWT signatures from base64url format to Uint8Array for Web Crypto API verification.
  * We use atob() to preserve framework-agnostic functionality.
  * 
  * @param base64url - The base64url-encoded string to convert
- * @returns ArrayBuffer containing the decoded binary data
+ * @returns Uint8Array containing the decoded binary data
  * 
  * @example
  * ```typescript
@@ -65,7 +65,7 @@ export function base64urlDecode(str: string): string {
  * 
  * @throws {DOMException} If the input contains invalid base64 characters
  */
-export function base64urlToArrayBuffer(base64url: string): ArrayBuffer {
+export function base64urlToArrayBuffer(base64url: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
   const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/') + padding;
   const binary = atob(base64);
@@ -76,18 +76,18 @@ export function base64urlToArrayBuffer(base64url: string): ArrayBuffer {
     view[i] = binary.charCodeAt(i);
   }
   
-  return buffer;
+  return view;
 }
 
 /**
- * Converts an ArrayBuffer to a base64-encoded string.
+ * Converts an ArrayBuffer or Uint8Array to a base64-encoded string.
  * 
  * Utility function for converting binary data from cryptographic operations
  * back to base64 format. Primarily used for debugging or when binary data
  * needs to be transmitted as text. We use btoa() to preserve
  * framework-agnostic functionality.
  * 
- * @param buffer - The ArrayBuffer containing binary data to encode
+ * @param buffer - The ArrayBuffer or Uint8Array containing binary data to encode
  * @returns Base64-encoded string representation of the buffer contents
  * 
  * @example
@@ -95,10 +95,14 @@ export function base64urlToArrayBuffer(base64url: string): ArrayBuffer {
  * const buffer = new TextEncoder().encode("Hello World");
  * const base64 = arrayBufferToBase64(buffer);
  * console.log(base64); // "SGVsbG8gV29ybGQ="
+ * 
+ * // Also works with ArrayBuffer
+ * const arrayBuf = new Uint8Array([72, 101, 108, 108, 111]).buffer;
+ * const base64 = arrayBufferToBase64(arrayBuf);
  * ```
  */
-export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+export function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -233,7 +237,7 @@ async function importRSAPublicKey(pemKey: string): Promise<CryptoKey> {
     // Import key using Web Crypto API with OWASP-recommended parameters
     const publicKey = await crypto.subtle.importKey(
       'spki', // SubjectPublicKeyInfo format
-      derBuffer,
+      derView,
       {
         name: 'RSASSA-PKCS1-v1_5',
         hash: 'SHA-256', // OWASP-approved hash function

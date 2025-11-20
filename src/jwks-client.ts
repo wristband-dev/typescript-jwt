@@ -326,22 +326,22 @@ export class JWKSClient {
    * 
    * Wrapped in a SubjectPublicKeyInfo structure with RSA algorithm identifier.
    * 
-   * @param n - RSA modulus as ArrayBuffer (from JWK 'n' parameter)
-   * @param e - RSA exponent as ArrayBuffer (from JWK 'e' parameter)
-   * @returns ArrayBuffer containing the DER-encoded public key
+   * @param n - RSA modulus as Uint8Array (from JWK 'n' parameter)
+   * @param e - RSA exponent as Uint8Array (from JWK 'e' parameter)
+   * @returns Uint8Array containing the DER-encoded public key
    * 
    * @private This method is used internally by jwkToPem()
    * 
    * @example
    * ```typescript
    * // Internal usage - converts binary RSA parameters to DER format
-   * const nBuffer = base64urlToArrayBuffer(jwk.n);  // RSA modulus
-   * const eBuffer = base64urlToArrayBuffer(jwk.e);  // RSA exponent (usually 65537)
+   * const nBuffer = base64urlToArrayBuffer(jwk.n);  // RSA modulus (Uint8Array)
+   * const eBuffer = base64urlToArrayBuffer(jwk.e);  // RSA exponent (Uint8Array, usually 65537)
    * const derBytes = this.createRSAPublicKeyDER(nBuffer, eBuffer);
-   * // derBytes now contains properly encoded ASN.1 DER data
+   * // derBytes now contains properly encoded ASN.1 DER data as Uint8Array
    * ```
    */
-  private createRSAPublicKeyDER(n: ArrayBuffer, e: ArrayBuffer): ArrayBuffer {
+  private createRSAPublicKeyDER(n: Uint8Array, e: Uint8Array): Uint8Array {
     const nBytes = new Uint8Array(n);
     const eBytes = new Uint8Array(e);
     
@@ -368,8 +368,8 @@ export class JWKSClient {
     // Final SEQUENCE
     const finalSequence = new Uint8Array([...rsaOID, ...bitString]);
     const finalLength = this.encodeLength(finalSequence.length);
-    
-    return new Uint8Array([0x30, ...finalLength, ...finalSequence]).buffer;
+
+    return new Uint8Array([0x30, ...finalLength, ...finalSequence]);
   }
   
   /**
