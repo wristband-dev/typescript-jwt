@@ -102,7 +102,7 @@ describe('Crypto Utils', () => {
         const input = 'SGVsbG8gV29ybGQ';
         const buffer = base64urlToArrayBuffer(input);
         
-        expect(buffer).toBeInstanceOf(ArrayBuffer);
+        expect(buffer).toBeInstanceOf(Uint8Array);
         
         const view = new Uint8Array(buffer);
         const decoded = Array.from(view).map(b => String.fromCharCode(b)).join('');
