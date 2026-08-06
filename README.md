@@ -28,8 +28,7 @@
 [![Actions Status](https://github.com/wristband-dev/typescript-jwt/workflows/Test/badge.svg)](https://github.com/wristband-dev/typescript-jwt/actions)
 [![License](https://img.shields.io/github/license/wristband-dev/typescript-jwt)](https://github.com/wristband-dev/typescript-jwt/blob/main/LICENSE.md)
 
-This framework-agnostic Typescript SDK validates JWT access tokens issued by Wristband for user or machine authentication. It uses the Wristband JWKS endpoint to resolve signing keys and verify RS256 signatures. Validation includes issuer verification, lifetime checks, and signature validation using cached keys. Developers should use this
-to protect routes and ensure that only valid, Wristband-issued access tokens can access secured APIs.
+This framework-agnostic Typescript SDK validates JWT access tokens issued by Wristband for user or machine authentication. It uses the Wristband JWKS endpoint to resolve signing keys and verify RS256 signatures. Validation includes issuer verification, lifetime checks, and signature validation using cached keys. Developers should use this to protect routes and ensure that only valid, Wristband-issued access tokens can access secured APIs.
 
 You can learn more about JWTs in Wristband in our documentation:
 

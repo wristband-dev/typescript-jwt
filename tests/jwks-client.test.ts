@@ -16,7 +16,10 @@ const create2048BitModulus = (): string => {
   const bytes = new Uint8Array(256);
   bytes.fill(0x41); // Fill with 'A' bytes for simplicity
   bytes[0] = 0x00; // Ensure positive integer (MSB = 0)
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 };
 
 const create1024BitModulus = (): string => {
@@ -24,7 +27,10 @@ const create1024BitModulus = (): string => {
   const bytes = new Uint8Array(128);
   bytes.fill(0x41);
   bytes[0] = 0x00;
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 };
 
 const VALID_JWK: JWKSKey = {
@@ -32,7 +38,7 @@ const VALID_JWK: JWKSKey = {
   kid: 'test-key-id',
   use: 'sig',
   n: create2048BitModulus(),
-  e: 'AQAB'
+  e: 'AQAB',
 };
 
 const WEAK_JWK: JWKSKey = {
@@ -40,7 +46,7 @@ const WEAK_JWK: JWKSKey = {
   kid: 'weak-key-id',
   use: 'sig',
   n: create1024BitModulus(),
-  e: 'AQAB'
+  e: 'AQAB',
 };
 
 const VALID_JWKS_RESPONSE: JWKSResponse = {
@@ -51,13 +57,12 @@ const VALID_JWKS_RESPONSE: JWKSResponse = {
       kid: 'another-key-id',
       use: 'sig',
       n: create2048BitModulus(),
-      e: 'AQAB'
-    }
-  ]
+      e: 'AQAB',
+    },
+  ],
 };
 
 describe('JWKSClient', () => {
-  
   beforeEach(() => {
     mockFetch.mockClear();
   });
@@ -66,8 +71,8 @@ describe('JWKSClient', () => {
     it('should throw when config is null or undefined', () => {
       // @ts-expect-error - Testing invalid input
       expect(() => new JWKSClient(null)).toThrow('A valid JWKS URI is required.');
-      
-      // @ts-expect-error - Testing invalid input  
+
+      // @ts-expect-error - Testing invalid input
       expect(() => new JWKSClient(undefined)).toThrow('A valid JWKS URI is required.');
     });
 
@@ -88,9 +93,9 @@ describe('JWKSClient', () => {
     it('should create client with default cache size', () => {
       const client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 20
+        cacheMaxSize: 20,
       });
-      
+
       expect(client.getCacheStats().maxSize).toBe(20);
     });
 
@@ -98,34 +103,34 @@ describe('JWKSClient', () => {
       const client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
         cacheMaxSize: 50,
-        cacheTtl: 3600000
+        cacheTtl: 3600000,
       });
-      
+
       expect(client.getCacheStats().maxSize).toBe(50);
     });
 
     it('should apply default cache size when not specified', () => {
       const client = new JWKSClient({
-        jwksUri: 'https://test.example.com/jwks'
+        jwksUri: 'https://test.example.com/jwks',
       });
-      
+
       expect(client.getCacheStats().maxSize).toBe(20);
     });
 
     it('should not instantiate cache until first use (lazy loading)', () => {
       const client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 20
+        cacheMaxSize: 20,
       });
-      
+
       // Cache should not be instantiated yet
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).toBeNull();
-      
+
       // First access should create the cache
       const stats = client.getCacheStats();
       expect(stats.maxSize).toBe(20);
-      
+
       // Cache should now be instantiated
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).not.toBeNull();
@@ -134,21 +139,21 @@ describe('JWKSClient', () => {
     it('should lazy-load cache on getSigningKey call', async () => {
       const client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
-      
+
       // Cache should not be instantiated yet
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).toBeNull();
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
-      
+
       // This should trigger cache creation
       await client.getSigningKey('test-key-id');
-      
+
       // Cache should now be instantiated
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).not.toBeNull();
@@ -157,16 +162,16 @@ describe('JWKSClient', () => {
     it('should lazy-load cache on clear call', () => {
       const client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
-      
+
       // Cache should not be instantiated yet
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).toBeNull();
-      
+
       // This should trigger cache creation
       client.clear();
-      
+
       // Cache should now be instantiated
       // @ts-expect-error - Accessing private property for testing
       expect(client.cache).not.toBeNull();
@@ -179,7 +184,7 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
     });
 
@@ -187,11 +192,11 @@ describe('JWKSClient', () => {
       it('should fetch and return a valid signing key', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => VALID_JWKS_RESPONSE
+          json: async () => VALID_JWKS_RESPONSE,
         } as Response);
 
         const key = await client.getSigningKey('test-key-id');
-        
+
         expect(key).toMatch(/^-----BEGIN PUBLIC KEY-----/);
         expect(key).toMatch(/-----END PUBLIC KEY-----$/);
         expect(mockFetch).toHaveBeenCalledWith('https://test.example.com/jwks');
@@ -200,15 +205,15 @@ describe('JWKSClient', () => {
       it('should return cached key on subsequent requests', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => VALID_JWKS_RESPONSE
+          json: async () => VALID_JWKS_RESPONSE,
         } as Response);
 
         // First call - should fetch
         const key1 = await client.getSigningKey('test-key-id');
-        
+
         // Second call - should use cache
         const key2 = await client.getSigningKey('test-key-id');
-        
+
         expect(key1).toBe(key2);
         expect(mockFetch).toHaveBeenCalledTimes(1);
         expect(client.getCacheStats().size).toBe(1);
@@ -217,18 +222,18 @@ describe('JWKSClient', () => {
       it('should handle multiple different keys', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => VALID_JWKS_RESPONSE
+          json: async () => VALID_JWKS_RESPONSE,
         } as Response);
 
         const key1 = await client.getSigningKey('test-key-id');
-        
+
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => VALID_JWKS_RESPONSE
+          json: async () => VALID_JWKS_RESPONSE,
         } as Response);
 
         const key2 = await client.getSigningKey('another-key-id');
-        
+
         // Both should be valid PEM keys
         expect(key1).toMatch(/^-----BEGIN PUBLIC KEY-----/);
         expect(key2).toMatch(/^-----BEGIN PUBLIC KEY-----/);
@@ -258,9 +263,10 @@ describe('JWKSClient', () => {
           .mockRejectedValueOnce(new Error('Network error'))
           .mockRejectedValueOnce(new Error('Network error'));
 
-        await expect(client.getSigningKey('test-key-id'))
-          .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
-        
+        await expect(client.getSigningKey('test-key-id')).rejects.toThrow(
+          'Failed to fetch JWKS after 3 attempts: Network error'
+        );
+
         expect(mockFetch).toHaveBeenCalledTimes(3);
         // should respect retry delay timing - 2 delays of 100ms each
         const elapsed = Date.now() - startTime;
@@ -272,61 +278,63 @@ describe('JWKSClient', () => {
       it('should throw when key ID is not found', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => VALID_JWKS_RESPONSE
+          json: async () => VALID_JWKS_RESPONSE,
         } as Response);
 
-        await expect(client.getSigningKey('nonexistent-key-id'))
-          .rejects.toThrow("Unable to find a signing key that matches 'nonexistent-key-id'");
+        await expect(client.getSigningKey('nonexistent-key-id')).rejects.toThrow(
+          "Unable to find a signing key that matches 'nonexistent-key-id'"
+        );
       });
 
       it('should throw when key is not RSA', async () => {
         const ecJwks = {
-          keys: [{
-            kty: 'EC',
-            kid: 'ec-key-id',
-            crv: 'P-256'
-          }]
+          keys: [
+            {
+              kty: 'EC',
+              kid: 'ec-key-id',
+              crv: 'P-256',
+            },
+          ],
         };
 
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => ecJwks
+          json: async () => ecJwks,
         } as Response);
 
-        await expect(client.getSigningKey('ec-key-id'))
-          .rejects.toThrow('Only RSA keys are supported');
+        await expect(client.getSigningKey('ec-key-id')).rejects.toThrow('Only RSA keys are supported');
       });
 
       it('should throw when JWK is missing required parameters', async () => {
         const invalidJwks = {
-          keys: [{
-            kty: 'RSA',
-            kid: 'invalid-key-id'
-            // Missing 'n' and 'e' parameters
-          }]
+          keys: [
+            {
+              kty: 'RSA',
+              kid: 'invalid-key-id',
+              // Missing 'n' and 'e' parameters
+            },
+          ],
         };
 
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => invalidJwks
+          json: async () => invalidJwks,
         } as Response);
 
-        await expect(client.getSigningKey('invalid-key-id'))
-          .rejects.toThrow('Invalid JWK: missing n or e parameters');
+        await expect(client.getSigningKey('invalid-key-id')).rejects.toThrow('Invalid JWK: missing n or e parameters');
       });
 
       it('should throw when RSA key is too weak', async () => {
         const weakJwks = {
-          keys: [WEAK_JWK]
+          keys: [WEAK_JWK],
         };
 
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => weakJwks
+          json: async () => weakJwks,
         } as Response);
 
-        await expect(client.getSigningKey('weak-key-id'))
-          .rejects.toThrow('RSA key too weak');
+        await expect(client.getSigningKey('weak-key-id')).rejects.toThrow('RSA key too weak');
       });
     });
 
@@ -334,21 +342,21 @@ describe('JWKSClient', () => {
       it('should handle empty key set', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ keys: [] })
+          json: async () => ({ keys: [] }),
         } as Response);
 
-        await expect(client.getSigningKey('any-key-id'))
-          .rejects.toThrow("Unable to find a signing key that matches 'any-key-id'");
+        await expect(client.getSigningKey('any-key-id')).rejects.toThrow(
+          "Unable to find a signing key that matches 'any-key-id'"
+        );
       });
 
       it('should handle malformed JWKS response', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ notKeys: [] })
+          json: async () => ({ notKeys: [] }),
         } as Response);
 
-        await expect(client.getSigningKey('any-key-id'))
-          .rejects.toThrow(); // Should throw when trying to access .keys
+        await expect(client.getSigningKey('any-key-id')).rejects.toThrow(); // Should throw when trying to access .keys
       });
     });
   });
@@ -359,7 +367,7 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 3
+        cacheMaxSize: 3,
       });
     });
 
@@ -367,14 +375,14 @@ describe('JWKSClient', () => {
       // Add some keys to cache
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       await client.getSigningKey('test-key-id');
       await client.getSigningKey('another-key-id');
-      
+
       expect(client.getCacheStats().size).toBe(2);
-      
+
       client.clear();
       expect(client.getCacheStats().size).toBe(0);
     });
@@ -382,7 +390,7 @@ describe('JWKSClient', () => {
     it('should respect cache size limits', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       // Add keys beyond cache size
@@ -390,18 +398,20 @@ describe('JWKSClient', () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            keys: [{
-              kty: 'RSA',
-              kid: `key-${i}`,
-              n: VALID_JWK.n,
-              e: VALID_JWK.e
-            }]
-          })
+            keys: [
+              {
+                kty: 'RSA',
+                kid: `key-${i}`,
+                n: VALID_JWK.n,
+                e: VALID_JWK.e,
+              },
+            ],
+          }),
         } as Response);
-        
+
         await client.getSigningKey(`key-${i}`);
       }
-      
+
       // Should not exceed maxSize
       expect(client.getCacheStats().size).toBeLessThanOrEqual(3);
     });
@@ -413,11 +423,11 @@ describe('JWKSClient', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       await client.getSigningKey('test-key-id');
-      
+
       const stats2 = client.getCacheStats();
       expect(stats2.size).toBe(1);
       expect(stats2.maxSize).toBe(3);
@@ -430,26 +440,26 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
     });
 
     it('should produce properly formatted PEM', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       const pem = await client.getSigningKey('test-key-id');
-      
+
       expect(pem).toMatch(/^-----BEGIN PUBLIC KEY-----\n/);
       expect(pem).toMatch(/\n-----END PUBLIC KEY-----$/);
-      
+
       // Should have proper line breaks (64 chars per line in body)
       const lines = pem.split('\n');
       expect(lines[0]).toBe('-----BEGIN PUBLIC KEY-----');
       expect(lines[lines.length - 1]).toBe('-----END PUBLIC KEY-----');
-      
+
       // Body lines should be <= 64 characters
       for (let i = 1; i < lines.length - 1; i++) {
         expect(lines[i].length).toBeLessThanOrEqual(64);
@@ -458,18 +468,20 @@ describe('JWKSClient', () => {
 
     it('should handle edge cases in JWK conversion', async () => {
       const edgeCaseJwk = {
-        keys: [{
-          kty: 'RSA',
-          kid: 'edge-case-key',
-          n: VALID_JWK.n,
-          e: 'AQ', // Different exponent
-          use: 'sig'
-        }]
+        keys: [
+          {
+            kty: 'RSA',
+            kid: 'edge-case-key',
+            n: VALID_JWK.n,
+            e: 'AQ', // Different exponent
+            use: 'sig',
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => edgeCaseJwk
+        json: async () => edgeCaseJwk,
       } as Response);
 
       const pem = await client.getSigningKey('edge-case-key');
@@ -478,18 +490,20 @@ describe('JWKSClient', () => {
 
     it('should handle JWK with minimal parameters', async () => {
       const minimalJwk = {
-        keys: [{
-          kty: 'RSA',
-          kid: 'minimal-key',
-          n: VALID_JWK.n,
-          e: VALID_JWK.e
-          // No 'use' or other optional parameters
-        }]
+        keys: [
+          {
+            kty: 'RSA',
+            kid: 'minimal-key',
+            n: VALID_JWK.n,
+            e: VALID_JWK.e,
+            // No 'use' or other optional parameters
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => minimalJwk
+        json: async () => minimalJwk,
       } as Response);
 
       const pem = await client.getSigningKey('minimal-key');
@@ -503,29 +517,34 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
     });
 
     it('should handle RSA parameters with MSB set (requiring padding)', async () => {
       // Create 2048-bit modulus with MSB set (starts with 0x80+)
       const msbSetJwk = {
-        keys: [{
-          kty: 'RSA',
-          kid: 'msb-set-key',
-          n: ((): string => {
-            const bytes = new Uint8Array(256); // 2048 bits
-            bytes.fill(0x41);
-            bytes[0] = 0x80; // Set MSB to trigger padding in ASN.1 encoding
-            return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-          })(),
-          e: 'AQAB'
-        }]
+        keys: [
+          {
+            kty: 'RSA',
+            kid: 'msb-set-key',
+            n: ((): string => {
+              const bytes = new Uint8Array(256); // 2048 bits
+              bytes.fill(0x41);
+              bytes[0] = 0x80; // Set MSB to trigger padding in ASN.1 encoding
+              return btoa(String.fromCharCode(...bytes))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+            })(),
+            e: 'AQAB',
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => msbSetJwk
+        json: async () => msbSetJwk,
       } as Response);
 
       const pem = await client.getSigningKey('msb-set-key');
@@ -535,17 +554,19 @@ describe('JWKSClient', () => {
     it('should handle various key sizes', async () => {
       // Test with a larger key
       const largeKeyJwk = {
-        keys: [{
-          kty: 'RSA',
-          kid: 'large-key',
-          n: 'sRJjz2muDCEbAjgGKrSMLzfw3mqA1Q_7U7ZHv1hQ7j1ZZD7M_K2Y0NCh1mZZDjzlF5aDMkc8b2C8vKj7sLXmnK7Q1vVEqrKmfh_A3XG8-pQlzXfz3u_G-I9xn8Ps6lIe-YX8DwL_5GKGqnhYtLQqnhR8JN9-L_yQK3_yEv_Z9LQsRJjz2muDCEbAjgGKrSMLzfw3mqA1Q_7U7ZHv1hQ7j1ZZD7M_K2Y0NCh1mZZDjzlF5aDMkc8b2C8vKj7sLXmnK7Q1vVEqrKmfh_A3XG8-pQlzXfz3u_G-I9xn8Ps6lIe-YX8DwL_5GKGqnhYtLQqnhR8JN9-L_yQK3_yEv_Z9LQ',
-          e: 'AQAB'
-        }]
+        keys: [
+          {
+            kty: 'RSA',
+            kid: 'large-key',
+            n: 'sRJjz2muDCEbAjgGKrSMLzfw3mqA1Q_7U7ZHv1hQ7j1ZZD7M_K2Y0NCh1mZZDjzlF5aDMkc8b2C8vKj7sLXmnK7Q1vVEqrKmfh_A3XG8-pQlzXfz3u_G-I9xn8Ps6lIe-YX8DwL_5GKGqnhYtLQqnhR8JN9-L_yQK3_yEv_Z9LQsRJjz2muDCEbAjgGKrSMLzfw3mqA1Q_7U7ZHv1hQ7j1ZZD7M_K2Y0NCh1mZZDjzlF5aDMkc8b2C8vKj7sLXmnK7Q1vVEqrKmfh_A3XG8-pQlzXfz3u_G-I9xn8Ps6lIe-YX8DwL_5GKGqnhYtLQqnhR8JN9-L_yQK3_yEv_Z9LQ',
+            e: 'AQAB',
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => largeKeyJwk
+        json: async () => largeKeyJwk,
       } as Response);
 
       const pem = await client.getSigningKey('large-key');
@@ -559,26 +580,26 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
     });
 
     it('should handle concurrent requests for same key', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       // Make multiple concurrent requests for the same key
-      const promises = Array(5).fill(0).map(() => 
-        client.getSigningKey('test-key-id')
-      );
+      const promises = Array(5)
+        .fill(0)
+        .map(() => client.getSigningKey('test-key-id'));
 
       const keys = await Promise.all(promises);
-      
+
       // All should return the same key
-      expect(keys.every(key => key === keys[0])).toBe(true);
-      
+      expect(keys.every((key) => key === keys[0])).toBe(true);
+
       // Should only have made one network request due to caching
       // Note: This test might be flaky due to timing, but generally should work
       expect(client.getCacheStats().size).toBe(1);
@@ -587,7 +608,7 @@ describe('JWKSClient', () => {
     it('should handle concurrent requests for different keys', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       // Make concurrent requests for different keys
@@ -595,7 +616,7 @@ describe('JWKSClient', () => {
       const promise2 = client.getSigningKey('another-key-id');
 
       const [key1, key2] = await Promise.all([promise1, promise2]);
-      
+
       // Both keys exist (they might be the same PEM if moduli are identical)
       expect(key1).toMatch(/^-----BEGIN PUBLIC KEY-----/);
       expect(key2).toMatch(/^-----BEGIN PUBLIC KEY-----/);
@@ -608,7 +629,7 @@ describe('JWKSClient', () => {
       const config = {
         jwksUri: 'https://test.example.com/jwks',
         cacheMaxSize: 25,
-        cacheTtl: 7200000
+        cacheTtl: 7200000,
       };
 
       const client = createJwksClient(config);
@@ -617,7 +638,7 @@ describe('JWKSClient', () => {
 
     it('should create client with minimal configuration', () => {
       const config = {
-        jwksUri: 'https://test.example.com/jwks'
+        jwksUri: 'https://test.example.com/jwks',
       };
 
       const client = createJwksClient(config);
@@ -631,7 +652,7 @@ describe('JWKSClient', () => {
     beforeEach(() => {
       client = new JWKSClient({
         jwksUri: 'https://test.example.com/jwks',
-        cacheMaxSize: 10
+        cacheMaxSize: 10,
       });
     });
 
@@ -642,8 +663,9 @@ describe('JWKSClient', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(client.getSigningKey('test-key-id'))
-        .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
+      await expect(client.getSigningKey('test-key-id')).rejects.toThrow(
+        'Failed to fetch JWKS after 3 attempts: Network error'
+      );
 
       // Second request succeeds on first try
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => VALID_JWKS_RESPONSE } as Response);
@@ -660,15 +682,16 @@ describe('JWKSClient', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(client.getSigningKey('test-key-id'))
-        .rejects.toThrow('Failed to fetch JWKS after 3 attempts: Network error');
+      await expect(client.getSigningKey('test-key-id')).rejects.toThrow(
+        'Failed to fetch JWKS after 3 attempts: Network error'
+      );
 
       expect(client.getCacheStats().size).toBe(0);
 
       // Second call should make another network request (another 3 attempts)
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => VALID_JWKS_RESPONSE
+        json: async () => VALID_JWKS_RESPONSE,
       } as Response);
 
       await client.getSigningKey('test-key-id');
@@ -683,29 +706,30 @@ describe('PEM formatting edge cases', () => {
     // Mock a scenario where base64 formatting could fail
     const originalMatch = String.prototype.match;
     String.prototype.match = jest.fn().mockReturnValue(null);
-    
+
     const client = new JWKSClient({
       jwksUri: 'https://test.example.com/jwks',
-      cacheMaxSize: 10
+      cacheMaxSize: 10,
     });
 
     const malformedJwks = {
-      keys: [{
-        kty: 'RSA',
-        kid: 'malformed-key',
-        n: create2048BitModulus(),
-        e: 'AQAB'
-      }]
+      keys: [
+        {
+          kty: 'RSA',
+          kid: 'malformed-key',
+          n: create2048BitModulus(),
+          e: 'AQAB',
+        },
+      ],
     };
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => malformedJwks
+      json: async () => malformedJwks,
     } as Response);
 
-    await expect(client.getSigningKey('malformed-key'))
-      .rejects.toThrow('Failed to format PEM body');
-    
+    await expect(client.getSigningKey('malformed-key')).rejects.toThrow('Failed to format PEM body');
+
     // Restore original method
     String.prototype.match = originalMatch;
   });
