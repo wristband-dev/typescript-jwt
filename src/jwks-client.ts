@@ -1,5 +1,5 @@
 import { CacheOptions, JWKSClientConfig, JWKSKey, JWKSResponse } from './types';
-import {  arrayBufferToBase64, base64urlToArrayBuffer } from './utils/crypto';
+import { arrayBufferToBase64, base64urlToArrayBuffer } from './utils/crypto';
 import { LRUCache } from './utils/cache';
 import { jwksMaxAttempts, jwksRetryDelayMs, pemFooter, pemHeader } from './constants';
 
@@ -7,21 +7,21 @@ const DEFAULT_CACHE_MAX_SIZE = 20;
 
 /**
  * Internal JWKS (JSON Web Key Set) client for fetching Wristband keys.
- * 
+ *
  * This client handles the complexities of JWKS key retrieval, validation, conversion, and caching
  * for JWT signature verification. It implements security best practices including key strength
  * validation, proper ASN.1 encoding, and efficient LRU caching to minimize network requests.
- * 
+ *
  * Key features:
  * - **Automatic key fetching** from Wristband JWKS endpoint
  * - **LRU caching** with configurable TTL to reduce network overhead
  * - **Security validation** ensuring keys meet OWASP strength requirements (≥2048-bit RSA)
  * - **Format conversion** from JWK to PEM format for Web Crypto API compatibility
  * - **Error handling** with descriptive messages for debugging
- * 
+ *
  * The client is designed for internal use by the JWT validator and handles all the low-level
  * details of JWKS protocol compliance and cryptographic key management.
- * 
+ *
  * @internal This class is not intended for direct external use
  */
 export class JWKSClient {
@@ -45,9 +45,9 @@ export class JWKSClient {
    * Creates a new JWKS client with the specified configuration. Initializes the internal LRU cache
    * with the provided size and TTL settings. The cache stores converted PEM keys indexed by their
    * key ID (kid) for fast retrieval.
-   * 
+   *
    * @param config - Configuration object specifying JWKS endpoint and cache settings
-   * 
+   *
    * @example
    * ```typescript
    * const client = new JWKSClient({
@@ -65,7 +65,7 @@ export class JWKSClient {
     this.cacheConfig = {
       // Undefined TTL = cached indefinitely
       maxSize: config.cacheMaxSize ?? DEFAULT_CACHE_MAX_SIZE,
-      ttl: config.cacheTtl
+      ttl: config.cacheTtl,
     };
   }
 
@@ -73,7 +73,7 @@ export class JWKSClient {
    * Returns the LRU cache instance, creating it on first access if needed.
    * This lazy initialization pattern prevents runtime object instantiation during
    * module loading, which can cause issues with bundlers like webpack.
-   * 
+   *
    * @private
    * @returns The LRU cache instance for storing PEM keys
    */
@@ -86,7 +86,7 @@ export class JWKSClient {
 
   /**
    * Retrieves a signing key by its key ID, with automatic caching and format conversion.
-   * 
+   *
    * This method implements the complete JWKS key retrieval workflow:
    * 1. Check LRU cache for previously converted key
    * 2. If not cached, fetch complete JWKS from Wristband
@@ -95,12 +95,12 @@ export class JWKSClient {
    * 5. Convert from JWK format to PEM format for Web Crypto API
    * 6. Cache the converted key for future use
    * 7. Return the PEM-formatted public key
-   * 
+   *
    * @param kid - The key ID (kid) to retrieve from the JWKS endpoint
    * @returns Promise resolving to the public key in PEM format
-   * 
+   *
    * @throws {Error} If JWKS fetch fails, key not found, non-RSA key, weak key (<2048 bits), or PEM conversion fails.
-   * 
+   *
    * @example
    * ```typescript
    * try {
@@ -127,8 +127,8 @@ export class JWKSClient {
 
     // Fetch JWKS from Wristband
     const jwks = await this.fetchJwksWithRetry();
-    const jwk = jwks.keys.find(k => k.kid === kid);
-    
+    const jwk = jwks.keys.find((k) => k.kid === kid);
+
     if (!jwk) {
       throw new Error(`Unable to find a signing key that matches '${kid}'`);
     }
@@ -148,17 +148,17 @@ export class JWKSClient {
 
   /**
    * Clears all cached keys from the internal cache.
-   * 
+   *
    * Useful for testing scenarios or when a complete cache invalidation is needed,
    * such as during key rotation events or security incidents.
-   * 
+   *
    * @example
    * ```typescript
    * // Clear cache during testing
    * beforeEach(() => {
    *   client.clear();
    * });
-   * 
+   *
    * // Emergency cache flush during security incident
    * if (securityIncident) {
    *   client.clear();
@@ -172,35 +172,35 @@ export class JWKSClient {
 
   /**
    * Returns cache statistics for monitoring and debugging purposes.
-   * 
+   *
    * Provides insights into cache utilization, which can be useful for:
    * - Performance monitoring and optimization
    * - Capacity planning for cache size configuration
    * - Debugging cache behavior in production
-   * 
+   *
    * @returns Object containing current cache statistics
-   * 
+   *
    * @example
    * ```typescript
    * const stats = client.getCacheStats();
    * console.log(`JWKS cache: ${stats.size}/${stats.maxSize} entries`);
-   * 
+   *
    * // Monitor cache efficiency
    * if (stats.size >= stats.maxSize * 0.9) {
    *   console.warn('JWKS cache nearing capacity');
    * }
-   * 
+   *
    * // Log for observability
    * logger.info('JWKS cache statistics', stats);
    * ```
    */
-  getCacheStats(): { size: number; maxSize: number; hitRatio?: number; } {
+  getCacheStats(): { size: number; maxSize: number; hitRatio?: number } {
     return this.getCache().getStats();
   }
 
-   /**
+  /**
    * Fetches JWKS from the endpoint with retry logic. Attempts up to 3 times with 100ms delay between attempts.
-   * 
+   *
    * @private
    * @returns Promise resolving to the JWKS response
    * @throws {Error} If all retry attempts fail
@@ -213,19 +213,21 @@ export class JWKSClient {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        return await response.json() as unknown as JWKSResponse;
+        return (await response.json()) as unknown as JWKSResponse;
       } catch (error) {
         const isLastAttempt = attempt === jwksMaxAttempts;
 
         if (isLastAttempt) {
-          throw new Error(`Failed to fetch JWKS after ${jwksMaxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw new Error(
+            `Failed to fetch JWKS after ${jwksMaxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
         }
 
         // Wait before next attempt
-        await new Promise(resolve => setTimeout(resolve, jwksRetryDelayMs));
+        await new Promise((resolve) => setTimeout(resolve, jwksRetryDelayMs));
       }
     }
-    
+
     // This should never be reached (appeasing Typescript)
     throw new Error('Unexpected error in JWKS fetch retry logic');
   }
@@ -237,20 +239,20 @@ export class JWKSClient {
    * - Security validation of key strength
    * - Proper ASN.1 DER encoding of RSA parameters
    * - PEM formatting with correct headers and line breaks
-   * 
+   *
    * Security features:
    * - Validates RSA key strength (minimum 2048 bits per OWASP)
    * - Ensures required JWK parameters (n, e) are present
    * - Implements proper cryptographic encoding standards
-   * 
+   *
    * @param jwk - The JSON Web Key to convert
    * @returns PEM-formatted RSA public key string
-   * 
+   *
    * @throws {Error} If required JWK parameters (n, e) are missing, RSA key is below
    * 2048-bit minimum security requirement, or PEM formatting fails.
-   * 
+   *
    * @private This method is used internally by getSigningKey()
-   * 
+   *
    * @example
    * ```typescript
    * // Internal usage - converts JWK like this:
@@ -262,7 +264,7 @@ export class JWKSClient {
    *   e: 'AQAB',
    *   use: 'sig'
    * };
-   * 
+   *
    * // To PEM format like this:
    * // -----BEGIN PUBLIC KEY-----
    * // MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
@@ -284,20 +286,20 @@ export class JWKSClient {
     // Convert JWK to proper ASN.1 DER format, then to PEM.
     const derBytes = this.createRSAPublicKeyDER(nBuffer, base64urlToArrayBuffer(jwk.e));
     const base64Der = arrayBufferToBase64(derBytes);
-    
+
     // Format as proper PEM with line breaks every 64 characters
     const pemBody = base64Der.match(/.{1,64}/g)?.join('\n');
     if (!pemBody) {
       throw new Error('Failed to format PEM body');
     }
-    
+
     return `${pemHeader}\n${pemBody}\n${pemFooter}`;
   }
 
   /**
    * Encodes an integer value in ASN.1 DER format. ASN.1 integers must be positive, so a padding byte (0x00)
    * is added if the most significant bit is set to prevent interpretation as negative.
-   * 
+   *
    * @param bytes - The integer bytes to encode
    * @returns ASN.1 DER encoded integer (tag + length + value)
    * @private
@@ -315,7 +317,7 @@ export class JWKSClient {
    * (Abstract Syntax Notation One) DER (Distinguished Encoding Rules) format required for RSA
    * public keys. The encoding follows RFC 3447 and OWASP cryptographic standards to ensure compatibility
    * with standard crypto libraries.
-   * 
+   *
    * The DER structure for RSA public keys is:
    * ```
    * RSAPublicKey ::= SEQUENCE {
@@ -323,15 +325,15 @@ export class JWKSClient {
    *   publicExponent  INTEGER   -- e
    * }
    * ```
-   * 
+   *
    * Wrapped in a SubjectPublicKeyInfo structure with RSA algorithm identifier.
-   * 
+   *
    * @param n - RSA modulus as Uint8Array (from JWK 'n' parameter)
    * @param e - RSA exponent as Uint8Array (from JWK 'e' parameter)
    * @returns Uint8Array containing the DER-encoded public key
-   * 
+   *
    * @private This method is used internally by jwkToPem()
-   * 
+   *
    * @example
    * ```typescript
    * // Internal usage - converts binary RSA parameters to DER format
@@ -344,53 +346,65 @@ export class JWKSClient {
   private createRSAPublicKeyDER(n: Uint8Array, e: Uint8Array): Uint8Array {
     const nBytes = new Uint8Array(n);
     const eBytes = new Uint8Array(e);
-    
+
     // ASN.1 DER encoding for RSA public key
     const nInteger = this.encodeInteger(nBytes);
     const eInteger = this.encodeInteger(eBytes);
-    
+
     // RSA public key sequence
     const sequence = new Uint8Array([...nInteger, ...eInteger]);
     const sequenceLength = this.encodeLength(sequence.length);
     const rsaSequence = new Uint8Array([0x30, ...sequenceLength, ...sequence]);
-    
+
     // RSA algorithm identifier (1.2.840.113549.1.1.1)
     const rsaOID = new Uint8Array([
-      0x30, 0x0d, // SEQUENCE
-      0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, // RSA OID
-      0x05, 0x00 // NULL
+      0x30,
+      0x0d, // SEQUENCE
+      0x06,
+      0x09,
+      0x2a,
+      0x86,
+      0x48,
+      0x86,
+      0xf7,
+      0x0d,
+      0x01,
+      0x01,
+      0x01, // RSA OID
+      0x05,
+      0x00, // NULL
     ]);
-    
+
     // BIT STRING containing the RSA sequence
     const bitStringLength = this.encodeLength(rsaSequence.length + 1);
     const bitString = new Uint8Array([0x03, ...bitStringLength, 0x00, ...rsaSequence]);
-    
+
     // Final SEQUENCE
     const finalSequence = new Uint8Array([...rsaOID, ...bitString]);
     const finalLength = this.encodeLength(finalSequence.length);
 
     return new Uint8Array([0x30, ...finalLength, ...finalSequence]);
   }
-  
+
   /**
    * Encodes length field in ASN.1 DER format. ASN.1 DER uses variable-length encoding for length fields:
    * - Short form: lengths 0-127 are encoded as a single byte
    * - Long form: longer lengths use multiple bytes with the first byte indicating how many additional
    *              length bytes follow
-   * 
+   *
    * This ensures efficient encoding while supporting arbitrarily large structures.
-   * 
+   *
    * @param length - The length value to encode (must be non-negative)
    * @returns Uint8Array containing the DER-encoded length
-   * 
+   *
    * @private This method is used internally by createRSAPublicKeyDER()
-   * 
+   *
    * @example
    * ```typescript
    * // Short form examples:
    * encodeLength(42)   // [42]           - single byte for lengths < 128
    * encodeLength(127)  // [127]          - maximum short form
-   * 
+   *
    * // Long form examples:
    * encodeLength(200)  // [0x81, 0xc8]   - 0x81 = "1 additional byte", 0xc8 = 200
    * encodeLength(1000) // [0x82, 0x03, 0xe8] - 0x82 = "2 additional bytes", 0x03e8 = 1000
@@ -400,24 +414,24 @@ export class JWKSClient {
     if (length < 0x80) {
       return new Uint8Array([length]);
     }
-    
+
     const bytes = [];
     let temp = length;
     while (temp > 0) {
       bytes.unshift(temp & 0xff);
       temp >>= 8;
     }
-    
+
     return new Uint8Array([0x80 | bytes.length, ...bytes]);
   }
 }
 
 /**
  * Factory function for creating a configured JWKS client instance.
- * 
+ *
  * @param config - Configuration object specifying JWKS endpoint and cache settings
  * @returns Configured JWKSClient instance ready for key retrieval operations
- * 
+ *
  * @example
  * ```typescript
  * // Create client for Wristband JWKS endpoint
@@ -426,11 +440,11 @@ export class JWKSClient {
  *   cacheMaxSize: 20,
  *   cacheTtl: 3600000 // 1 hour TTL
  * });
- * 
+ *
  * // Use in JWT validator
  * const publicKey = await client.getSigningKey('kid-abc123');
  * ```
- * 
+ *
  * @internal This function is used internally by the JWT validator factory
  */
 export function createJwksClient(config: JWKSClientConfig): JWKSClient {

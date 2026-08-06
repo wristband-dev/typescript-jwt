@@ -4,33 +4,33 @@ import {
   base64urlDecode,
   base64urlToArrayBuffer,
   validateAlgorithm,
-  verifyRS256Signature
+  verifyRS256Signature,
 } from '../../src/utils/crypto';
 
 const TEST_VECTORS = {
   // Standard test cases
   base64url: {
-    'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9': '{"alg":"RS256","typ":"JWT"}',
-    'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0': '{"sub":"1234567890","name":"John Doe"}',
-    'SGVsbG8gV29ybGQ': 'Hello World',
-    'YQ': 'a',
-    '': ''
+    eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9: '{"alg":"RS256","typ":"JWT"}',
+    eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0: '{"sub":"1234567890","name":"John Doe"}',
+    SGVsbG8gV29ybGQ: 'Hello World',
+    YQ: 'a',
+    '': '',
   },
   // Edge cases
   edgeCases: {
-    'QQ': 'A',           // Single character
-    'QUE': 'AA',         // Two characters  
-    'QUJD': 'ABC',       // Three characters
-    'QUJDRA': 'ABCD'     // Four characters
+    QQ: 'A', // Single character
+    QUE: 'AA', // Two characters
+    QUJD: 'ABC', // Three characters
+    QUJDRA: 'ABCD', // Four characters
   },
   // Invalid base64url
   invalid: [
-    'invalid+chars',     // Contains +
-    'invalid/chars',     // Contains /
-    'invalid=padding',   // Contains =
-    'invalid chars',     // Contains space
-    'invalid\nchars'     // Contains newline
-  ]
+    'invalid+chars', // Contains +
+    'invalid/chars', // Contains /
+    'invalid=padding', // Contains =
+    'invalid chars', // Contains space
+    'invalid\nchars', // Contains newline
+  ],
 };
 
 // Test RSA key for crypto operations
@@ -42,7 +42,6 @@ dLEA0H0ws13F1EQJ1YC6LCzLK9CK13BZhNB8MIGlBqNjHCmYJE7CkO0A5X5wOnIp
 ${pemFooter}`;
 
 describe('Crypto Utils', () => {
-  
   describe('base64urlDecode', () => {
     describe('valid inputs', () => {
       Object.entries(TEST_VECTORS.base64url).forEach(([input, expected]) => {
@@ -101,11 +100,13 @@ describe('Crypto Utils', () => {
       it('should convert base64url to ArrayBuffer correctly', () => {
         const input = 'SGVsbG8gV29ybGQ';
         const buffer = base64urlToArrayBuffer(input);
-        
+
         expect(buffer).toBeInstanceOf(Uint8Array);
-        
+
         const view = new Uint8Array(buffer);
-        const decoded = Array.from(view).map(b => String.fromCharCode(b)).join('');
+        const decoded = Array.from(view)
+          .map((b) => String.fromCharCode(b))
+          .join('');
         expect(decoded).toBe('Hello World');
       });
 
@@ -113,7 +114,7 @@ describe('Crypto Utils', () => {
         const input = 'QQ';
         const buffer = base64urlToArrayBuffer(input);
         const view = new Uint8Array(buffer);
-        
+
         expect(view.length).toBe(1);
         expect(view[0]).toBe(65);
       });
@@ -129,10 +130,10 @@ describe('Crypto Utils', () => {
           .replace(/\+/g, '-')
           .replace(/\//g, '_')
           .replace(/=/g, '');
-        
+
         const result = base64urlToArrayBuffer(base64);
         const resultView = new Uint8Array(result);
-        
+
         expect(resultView).toEqual(binaryData);
       });
     });
@@ -158,7 +159,7 @@ describe('Crypto Utils', () => {
       const text = 'Hello World';
       const buffer = new TextEncoder().encode(text);
       const base64 = arrayBufferToBase64(buffer);
-      
+
       const decoded = atob(base64);
       expect(decoded).toBe(text);
     });
@@ -172,20 +173,20 @@ describe('Crypto Utils', () => {
     it('should handle binary data', () => {
       const binaryData = new Uint8Array([0, 1, 2, 3, 4, 255]);
       const base64 = arrayBufferToBase64(binaryData.buffer);
-      
+
       const decoded = atob(base64);
       const decodedBytes = new Uint8Array(decoded.length);
       for (let i = 0; i < decoded.length; i++) {
         decodedBytes[i] = decoded.charCodeAt(i);
       }
-      
+
       expect(decodedBytes).toEqual(binaryData);
     });
 
     it('should produce valid base64', () => {
       const buffer = new TextEncoder().encode('Test data for base64 encoding');
       const base64 = arrayBufferToBase64(buffer);
-      
+
       expect(base64).toMatch(/^[A-Za-z0-9+/]*={0,2}$/);
     });
 
@@ -229,10 +230,10 @@ describe('Crypto Utils', () => {
         const originalCrypto = globalThis.crypto;
         // @ts-expect-error - Testing by removing crypto
         delete globalThis.crypto;
-        
+
         const result = await verifyRS256Signature('data', 'signature', TEST_PUBLIC_KEY);
         expect(result).toBe(false);
-        
+
         globalThis.crypto = originalCrypto;
       });
 
@@ -241,10 +242,10 @@ describe('Crypto Utils', () => {
         const originalCrypto = globalThis.crypto;
         // @ts-expect-error - Testing by modifying crypto
         globalThis.crypto = {};
-        
+
         const result = await verifyRS256Signature('data', 'signature', TEST_PUBLIC_KEY);
         expect(result).toBe(false);
-        
+
         globalThis.crypto = originalCrypto;
         consoleSpy.mockRestore();
       });
@@ -253,57 +254,41 @@ describe('Crypto Utils', () => {
     describe('real signature verification', () => {
       it('should handle invalid signatures', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        const result = await verifyRS256Signature(
-          'test.data',
-          'invalid_signature_data',
-          TEST_PUBLIC_KEY
-        );
+        const result = await verifyRS256Signature('test.data', 'invalid_signature_data', TEST_PUBLIC_KEY);
         expect(result).toBe(false);
         consoleSpy.mockRestore();
       });
 
       it('should handle malformed public keys', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        const result = await verifyRS256Signature(
-          'data',
-          'signature',
-          'invalid-pem-format'
-        );
+        const result = await verifyRS256Signature('data', 'signature', 'invalid-pem-format');
         expect(result).toBe(false);
         consoleSpy.mockRestore();
       });
 
       it('should handle malformed signatures', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        const result = await verifyRS256Signature(
-          'data',
-          'not-base64url!@#$',
-          TEST_PUBLIC_KEY
-        );
+        const result = await verifyRS256Signature('data', 'not-base64url!@#$', TEST_PUBLIC_KEY);
         expect(result).toBe(false);
         consoleSpy.mockRestore();
       });
 
       it('should use correct algorithm parameters', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        
+
         const result = await verifyRS256Signature('data', 'dGVzdA', TEST_PUBLIC_KEY);
-        
+
         // Should return false for invalid signature without logging
         expect(result).toBe(false);
         expect(consoleSpy).not.toHaveBeenCalled(); // Verify silent operation
-        
+
         consoleSpy.mockRestore();
       });
 
       it('should handle verification process end-to-end', async () => {
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        const result = await verifyRS256Signature(
-          'header.payload',
-          'dGVzdHNpZ25hdHVyZQ',
-          TEST_PUBLIC_KEY
-        );
-        
+        const result = await verifyRS256Signature('header.payload', 'dGVzdHNpZ25hdHVyZQ', TEST_PUBLIC_KEY);
+
         expect(typeof result).toBe('boolean');
         consoleSpy.mockRestore();
       });
@@ -331,7 +316,7 @@ describe('Crypto Utils', () => {
 
       it('should handle multiple allowed algorithms', () => {
         const allowedAlgs = ['RS256', 'RS384', 'RS512'];
-        
+
         expect(validateAlgorithm('RS256', allowedAlgs)).toBe(true);
         expect(validateAlgorithm('RS384', allowedAlgs)).toBe(true);
         expect(validateAlgorithm('RS512', allowedAlgs)).toBe(true);
@@ -412,8 +397,8 @@ describe('Crypto Utils', () => {
       it('should implement allowlist approach (OWASP recommendation)', () => {
         const commonAlgorithms = ['HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'ES256', 'PS256'];
         const allowedAlgs = ['RS256'];
-        
-        commonAlgorithms.forEach(alg => {
+
+        commonAlgorithms.forEach((alg) => {
           if (alg === 'RS256') {
             expect(validateAlgorithm(alg, allowedAlgs)).toBe(true);
           } else {
@@ -435,7 +420,7 @@ describe('Crypto Utils', () => {
       const jwtHeader = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9';
       const decoded = base64urlDecode(jwtHeader);
       const headerObj = JSON.parse(decoded);
-      
+
       expect(headerObj.alg).toBe('RS256');
       expect(headerObj.typ).toBe('JWT');
       expect(validateAlgorithm(headerObj.alg, ['RS256'])).toBe(true);
@@ -443,12 +428,12 @@ describe('Crypto Utils', () => {
 
     it('should handle base64url roundtrip consistency', () => {
       const originalData = 'Hello, World! This is a test string with special characters: !@#$%^&*()';
-      
+
       const buffer = new TextEncoder().encode(originalData);
       const base64 = arrayBufferToBase64(buffer);
       const base64url = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
       const decoded = base64urlDecode(base64url);
-      
+
       expect(decoded).toBe(originalData);
     });
 
@@ -456,7 +441,7 @@ describe('Crypto Utils', () => {
       const header = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9';
       const payload = 'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0';
       const signingInput = `${header}.${payload}`;
-      
+
       const dataBuffer = new TextEncoder().encode(signingInput);
       expect(dataBuffer).toBeInstanceOf(Uint8Array);
       expect(dataBuffer.length).toBeGreaterThan(0);
@@ -466,13 +451,13 @@ describe('Crypto Utils', () => {
   describe('error handling and logging', () => {
     it('should not expose sensitive information in errors', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const result = await verifyRS256Signature('data', 'invalid-signature', 'invalid-key');
-      
+
       // Should return false and NOT log anything (good for SDK)
       expect(result).toBe(false);
       expect(consoleSpy).not.toHaveBeenCalled(); // Verify no logging
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -500,7 +485,7 @@ describe('Crypto Utils', () => {
         'dGVzdHNpZ25hdHVyZQ', // Valid base64url format
         realPublicKey
       );
-      
+
       // Should return false (signature won't match) but will execute crypto.subtle.verify
       expect(result).toBe(false);
     });

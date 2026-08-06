@@ -12,7 +12,7 @@ import { createJwksClient, JWKSClient } from './jwks-client';
  * Concrete implementation of the WristbandJwtValidator interface that provides JWT validation capabilities,
  * including Bearer token extraction, signature verification using JWKS, and comprehensive claim validation
  * following OWASP security recommendations.
- * 
+ *
  * @internal This class is not intended for direct instantiation by consumers.
  * Use the `createWristbandJwtValidator` factory function instead.
  */
@@ -32,7 +32,7 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
 
   /**
    * Creates a new WristbandJwtValidatorImpl instance.
-   * 
+   *
    * @param jwksClient - Configured JWKS client for key retrieval
    * @param issuer - Expected issuer URL for token validation
    * @param algorithms - Allowed signing algorithms (defaults to ['RS256'])
@@ -61,29 +61,29 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
   /**
    * Extracts the raw Bearer token from an HTTP Authorization header. Handles various input formats and
    * validates the Bearer scheme according to RFC 6750.
-   * 
+   *
    * Valid cases:
    * - `extractBearerToken('Bearer abc123')`
    * - `extractBearerToken(['Bearer abc123'])`
-   * 
+   *
    * Invalid cases:
    * - `extractBearerToken(['Bearer abc', 'Bearer xyz'])` - Multiple headers
    * - `extractBearerToken([])` - Empty array
    * - `extractBearerToken([''])` - Empty string in array
    * - `extractBearerToken(['Basic abc123'])` - Wrong auth scheme
-   * 
+   *
    * @param authorizationHeader - The Authorization header value(s)
    * @returns The extracted Bearer token string
    * @throws {Error} When header is missing, malformed, contains multiple entries, or uses wrong scheme
    */
-  extractBearerToken(authorizationHeader?: string | string[] | null): string {  
+  extractBearerToken(authorizationHeader?: string | string[] | null): string {
     // Handle null/undefined
     if (!authorizationHeader) {
       throw new Error('No authorization header provided');
     }
-    
+
     let headerValue: string;
-    
+
     // Handle array
     if (Array.isArray(authorizationHeader)) {
       if (authorizationHeader.length === 0) {
@@ -96,21 +96,21 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
     } else {
       headerValue = authorizationHeader;
     }
-    
+
     // Handle empty string
     if (!headerValue?.trim()) {
       throw new Error('No authorization header provided');
     }
-    
+
     if (!headerValue.startsWith('Bearer ')) {
       throw new Error('Authorization header must provide "Bearer" token');
     }
-    
+
     const token = headerValue.substring(7);
     if (!token) {
       throw new Error('No token provided');
     }
-    
+
     return token;
   }
 
@@ -129,11 +129,11 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
       }
 
       const [headerB64, payloadB64, signatureB64] = parts;
-      
+
       // Decode header and payload
       let header: JWTHeader;
       let payload: JWTPayload;
-      
+
       try {
         header = JSON.parse(base64urlDecode(headerB64)) as JWTHeader;
         payload = JSON.parse(base64urlDecode(payloadB64)) as JWTPayload;
@@ -143,17 +143,17 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
 
       // Validate algorithm using OWASP-recommended practices
       if (!validateAlgorithm(header.alg, this.algorithms)) {
-        return { 
-          isValid: false, 
-          errorMessage: `Algorithm ${header.alg} not allowed. Expected one of: ${this.algorithms.join(', ')}` 
+        return {
+          isValid: false,
+          errorMessage: `Algorithm ${header.alg} not allowed. Expected one of: ${this.algorithms.join(', ')}`,
         };
       }
 
       // Validate issuer
       if (payload.iss !== this.issuer) {
-        return { 
-          isValid: false, 
-          errorMessage: `Invalid issuer. Expected ${this.issuer}, got ${payload.iss}` 
+        return {
+          isValid: false,
+          errorMessage: `Invalid issuer. Expected ${this.issuer}, got ${payload.iss}`,
         };
       }
 
@@ -176,8 +176,8 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
       try {
         publicKey = await this.jwksClient.getSigningKey(header.kid);
       } catch (error) {
-        return { 
-          isValid: false, 
+        return {
+          isValid: false,
           errorMessage: `Failed to get signing key: ${error instanceof Error ? error.message : 'Unknown error'}`,
         };
       }
@@ -191,35 +191,35 @@ export class WristbandJwtValidatorImpl implements WristbandJwtValidator {
       // Validation Success
       return { isValid: true, payload };
     } catch (error) {
-      return {  isValid: false,  errorMessage: error instanceof Error ? error.message : 'Token validation failed' };
+      return { isValid: false, errorMessage: error instanceof Error ? error.message : 'Token validation failed' };
     }
   }
 }
 
 /**
  * Factory function for creating a configured Wristband JWT validator instance.
- * 
+ *
  * The created validator is thread-safe and should be reused across requests to
  * benefit from JWKS key caching and connection pooling.
- * 
+ *
  * @param config - Configuration object containing Wristband domain and cache settings
  * @returns Configured WristbandJwtValidator instance ready for token validation
- * 
+ *
  * @example
  * ```typescript
  * import { createWristbandJwtValidator } from '@wristband/jwt-validation';
- * 
+ *
  * // Create validator instance (reuse across requests)
  * const validator = createWristbandJwtValidator({
  *   wristbandApplicationVanityDomain: 'myapp.wristband.dev',
  * });
- * 
+ *
  * // Express.js route handler example usage
  * app.get('/protected', async (req, res) => {
  *   try {
  *     const token = validator.extractBearerToken(req.headers.authorization);
  *     const result = await validator.validate(token);
- *     
+ *
  *     if (result.isValid) {
  *       res.json({ user: result.payload?.sub, message: 'Access granted' });
  *     } else {

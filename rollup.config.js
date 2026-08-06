@@ -17,19 +17,19 @@ export default [
         format: 'cjs',
         exports: 'named',
         sourcemap: true,
-        interop: 'auto'
+        interop: 'auto',
       },
       {
         file: 'dist/index.esm.js',
         format: 'es',
         exports: 'named',
-        sourcemap: true
-      }
+        sourcemap: true,
+      },
     ],
     external,
     plugins: [
       nodeResolve({
-        preferBuiltins: true
+        preferBuiltins: true,
       }),
       commonjs(),
       typescript({
@@ -39,21 +39,19 @@ export default [
         sourceMap: true,
         compilerOptions: {
           module: 'esnext',
-          target: 'es2020'
-        }
-      })
-    ]
+          target: 'es2020',
+        },
+      }),
+    ],
   },
   // Types bundle
   {
     input: 'src/index.ts',
     output: {
       file: 'dist/index.d.ts',
-      format: 'es'
+      format: 'es',
     },
     external,
-    plugins: [
-      dts()
-    ]
-  }
+    plugins: [dts()],
+  },
 ];

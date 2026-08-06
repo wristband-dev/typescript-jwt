@@ -21,7 +21,7 @@ export interface WristbandJwtValidator {
 
   /**
    * Validates a JWT token using the Wristband JWKS endpoint and RS256 signature.
-   * 
+   *
    * Performs checks for:
    * - Proper JWT structure
    * - Supported algorithm (RS256)
@@ -67,38 +67,38 @@ export interface JWTPayload {
    * Issuer claim - identifies the principal that issued the JWT.
    */
   iss?: string;
-  
+
   /**
    * Subject claim - identifies the principal that is the subject of the JWT.
    */
   sub?: string;
-  
+
   /**
    * Audience claim - identifies the recipients that the JWT is intended for.
    */
   aud?: string | string[];
-  
+
   /**
    * Expiration time claim - identifies the expiration time on or after which the JWT must not be accepted for
    * processing (Unix timestamp).
    */
   exp?: number;
-  
+
   /**
    * Not before claim - identifies the time before which the JWT must not be accepted for processing (Unix timestamp).
    */
   nbf?: number;
-  
+
   /**
    * Issued at claim - identifies the time at which the JWT was issued (Unix timestamp).
    */
   iat?: number;
-  
+
   /**
    * JWT ID claim - provides a unique identifier for the JWT.
    */
   jti?: string;
-  
+
   /**
    * Any other additional claims included in the payload.
    */
@@ -115,12 +115,12 @@ export interface JwtValidationResult {
    * Flag indicating whether the token is valid or not.
    */
   isValid: boolean;
-  
+
   /**
    * Decoded JWT payload, if valid.
    */
   payload?: JWTPayload;
-  
+
   /**
    * Error message, if validation failed.
    */
@@ -139,12 +139,12 @@ export interface JWKSClientConfig {
    * The URI endpoint for fetching the JSON Web Key Set.
    */
   jwksUri: string;
-  
+
   /**
    * Maximum number of keys to store in the cache.
    */
   cacheMaxSize?: number;
-  
+
   /**
    * Time-to-live for cached keys, in milliseconds. If undefined, keys are cached indefinitely until evicted.
    */
@@ -160,37 +160,37 @@ export interface JWKSKey {
    * Key type parameter - identifies the cryptographic algorithm family used with the key.
    */
   kty: string;
-  
+
   /**
    * Key ID parameter - used to match a specific key during signature verification.
    */
   kid: string;
-  
+
   /**
    * Public key use parameter - identifies the intended use of the public key.
    */
   use?: string;
-  
+
   /**
    * RSA modulus parameter - represents the modulus value for RSA public keys (base64url-encoded).
    */
   n?: string;
-  
+
   /**
    * RSA exponent parameter - represents the exponent value for RSA public keys (base64url-encoded).
    */
   e?: string;
-  
+
   /**
    * X.509 certificate chain parameter - contains the X.509 public key certificate or certificate chain.
    */
   x5c?: string[];
-  
+
   /**
    * X.509 certificate SHA-1 thumbprint parameter - base64url-encoded SHA-1 thumbprint of the X.509 certificate.
    */
   x5t?: string;
-  
+
   /**
    * Algorithm parameter - identifies the algorithm intended for use with the key.
    */
@@ -217,12 +217,12 @@ export interface JWTHeader {
    * For Wristband tokens, this should be "RS256".
    */
   alg: string;
-  
+
   /**
    * Type parameter - declares the media type of the JWT.
    */
   typ: string;
-  
+
   /**
    * Key ID parameter - hints about which key was used to secure the JWT. Used to match against the corresponding JWK
    * during verification.
