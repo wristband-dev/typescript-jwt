@@ -32,7 +32,7 @@ This framework-agnostic Typescript SDK validates JWT access tokens issued by Wri
 
 You can learn more about JWTs in Wristband in our documentation:
 
-- [JWTs and Signing Keys](https://docs.wristband.dev/docs/json-web-tokens-jwts-and-signing-keys)
+- [JWTs and Signing Keys](https://docs.wristband.dev/docs/jwts-and-signing-keys)
 
 <br/>
 
